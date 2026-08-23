@@ -18,7 +18,6 @@
 3. 执行前写入本轮任务卡，执行后回写结果。
 4. 自动初始化命令按系统选择：
 - macOS/Linux：`bash research-writing-skill/scripts/init_plan.sh`
-- Windows PowerShell：`powershell -ExecutionPolicy Bypass -File research-writing-skill/scripts/init_plan.ps1`
 
 ### 1.3 例外场景
 

@@ -109,9 +109,9 @@ Medium or full-paper tasks should go through `skills/paper-orchestration/` first
 
 Common checks:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/check_skill_integrity.ps1
-powershell -ExecutionPolicy Bypass -File scripts/research_quality_gate.ps1 -ProjectPath <paper-project>
+```bash
+python3 scripts/research_quality_gate.py --project <paper-project>
+python3 scripts/status_contract.py <paper-project> --submission
 ```
 
 ## Skill Map

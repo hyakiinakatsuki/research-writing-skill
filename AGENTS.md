@@ -40,8 +40,7 @@
 - 任何写作任务前必须完成头脑风暴
 - 中型任务必须有任务包、两阶段 review 和 capability-use audit
 - 引言和相关工作必须先完成 evidence map
-- skill 改造后运行 `scripts/check_skill_integrity.ps1`
-- 稿件交付前运行 `scripts/research_quality_gate.ps1 -ProjectPath <paper-project>`
+- 稿件交付前运行 `python3 scripts/research_quality_gate.py --project <paper-project>`
 - 必须创建 plan/ 目录记录项目信息
 - 每章写完必须让用户确认
 - 绝不编造文献

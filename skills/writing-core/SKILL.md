@@ -148,10 +148,6 @@ bash research-writing-skill/scripts/style_check.sh <文件.md>
 ```
 
 **Windows PowerShell：**
-```powershell
-powershell -ExecutionPolicy Bypass -File research-writing-skill/scripts/style_check.ps1 -FilePath <文件.md>
-```
-
 ## 八、执行约束
 
 1. 长任务开始前必须读取或创建 `plan/`

@@ -40,8 +40,7 @@ allowed-tools: Read, Bash, Grep
 | 格式正确 | 运行格式检查脚本 | 目测检查 |
 | 无AI痕迹 | 运行风格检查脚本 | "读起来还行" |
 | 文献搜索完成 | 结果数量、DOI 列表、JSON 文件存在 | "搜过了" |
-| skill 改造完成 | 运行 `scripts/check_skill_integrity.ps1` | "文件都写了" |
-| 初稿达到质量门 | 运行 `scripts/research_quality_gate.ps1` | 只运行 style_check |
+| 初稿达到质量门 | 运行 `scripts/research_quality_gate.py` | 只运行 style_check |
 | 终稿状态可信 | 运行 `scripts/status_contract.py <paper-project> --submission` | `DRAFT PASS` 后再写 `STATUS: PASS` |
 
 ## Red Flags - 停止
@@ -113,16 +112,12 @@ python3 research-writing-skill/scripts/status_contract.py <paper-project> --subm
 
 ### Windows（PowerShell）
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/check_skill_integrity.ps1
-```
-
 用于确认新增技能、路由、验证脚本和关键门控仍然存在。
 
 ### 稿件质量门验证
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/research_quality_gate.ps1 -ProjectPath <paper-project>
+powershell -ExecutionPolicy Bypass -File python3 scripts/research_quality_gate.py --project <paper-project>
 ```
 
 用于检查引用覆盖、正文污染、列表化、占位策略、figure data manifest 和 evidence map。投稿前加 `-Submission`，禁止未回填占位。
