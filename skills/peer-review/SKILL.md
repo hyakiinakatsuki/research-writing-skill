@@ -5,6 +5,25 @@ description: Use before submission or when reviewing papers - provides evaluatio
 
 # 同行评审与自审
 
+<HARD-GATE>
+评审报告必须包含以下要素，否则不得标记为通过：
+1. 至少一条具体缺陷（含文件路径和行号）
+2. 至少一条改进建议（可执行的）
+3. 禁止使用"全部可信""未发现编造"等无依据的全称判断
+4. 评审分数必须基于实际指标（禁用词命中、引用覆盖率、段落合规率）
+</HARD-GATE>
+
+## 返回合约
+
+评审完成后必须返回：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| status | enum | REVIEW_PASS / REVIEW_FAIL / REVIEW_NEEDS_CONTEXT |
+| findings | list | 具体缺陷列表（file:line + 描述） |
+| score | int | 基于实际指标的分数（0-100） |
+| verdict | enum | PASS / FAIL / CONDITIONAL |
+
 本技能提供论文评审、自我审视和批判性分析的完整指南。
 
 ## Checklist

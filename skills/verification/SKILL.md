@@ -42,6 +42,7 @@ allowed-tools: Read, Bash, Grep
 | 文献搜索完成 | 结果数量、DOI 列表、JSON 文件存在 | "搜过了" |
 | skill 改造完成 | 运行 `scripts/check_skill_integrity.ps1` | "文件都写了" |
 | 初稿达到质量门 | 运行 `scripts/research_quality_gate.ps1` | 只运行 style_check |
+| 终稿状态可信 | 运行 `scripts/status_contract.py <paper-project> --submission` | `DRAFT PASS` 后再写 `STATUS: PASS` |
 
 ## Red Flags - 停止
 
@@ -97,6 +98,21 @@ allowed-tools: Read, Bash, Grep
 
 ### Skill 完整性验证
 
+### macOS/Linux（推荐）
+
+```bash
+# 完整性检查
+python3 research-writing-skill/scripts/research_quality_gate.py --project-path <paper-project> --submission
+
+# 严格质量门
+python3 research-writing-skill/scripts/strict_quality_gate.py <paper-project> --mode strict
+
+# 状态契约验证
+python3 research-writing-skill/scripts/status_contract.py <paper-project> --submission
+```
+
+### Windows（PowerShell）
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/check_skill_integrity.ps1
 ```
@@ -110,6 +126,14 @@ powershell -ExecutionPolicy Bypass -File scripts/research_quality_gate.ps1 -Proj
 ```
 
 用于检查引用覆盖、正文污染、列表化、占位策略、figure data manifest 和 evidence map。投稿前加 `-Submission`，禁止未回填占位。
+
+### 状态契约验证
+
+```bash
+python scripts/status_contract.py <paper-project> --submission
+```
+
+用于确认终稿 `STATUS: PASS` 没有被初稿、跳过门控、缺失 LaTeX/PDF/评审报告或失败命令污染。该命令返回非 0 时，不能声称论文完成。
 
 ### 文献搜索验证
 

@@ -1,6 +1,6 @@
 ---
 name: writing-chapters
-description: Use when writing paper chapters - requires completed brainstorming, writes one chapter at a time with user confirmation
+description: Use when writing paper chapters - requires recorded topic scope and plan, writes auditable chapter files with verification and progress records
 ---
 
 # 章节写作
@@ -10,7 +10,7 @@ description: Use when writing paper chapters - requires completed brainstorming,
 <HARD-GATE>
 调用此技能前必须满足以下条件：
 1. plan/project-overview.md 存在且包含论文类型和章节结构
-2. plan/outline.md 存在且已确认
+2. plan/outline.md 存在且章节结构已记录
 3. chapters/ 目录已创建
 
 如果任何条件不满足，必须先调用 brainstorming-research 技能。
@@ -28,10 +28,10 @@ description: Use when writing paper chapters - requires completed brainstorming,
 
 ## Checklist（每章必须完成）
 
-- [ ] 读取 plan/outline.md 确认本章目标和要点
-- [ ] 如果存在 plan/chapter-architecture.md，确认本章文件名、最小正文长度和 agent owner
+- [ ] 读取 plan/outline.md 记录本章目标和要点
+- [ ] 如果存在 plan/chapter-architecture.md，记录本章文件名、最小正文长度和 agent owner
 - [ ] 检查前置章节是否完成（按逻辑顺序）
-- [ ] 与用户确认本章关键论点和内容方向
+- [ ] 从 task packet、outline、evidence map 中提取本章关键论点和内容方向；只有冲突或证据缺口时才询问用户
 - [ ] 根据学科领域调用对应写作模块
 - [ ] 对引言/相关工作读取 evidence-driven-writing 产物
 - [ ] 对方法章节检查输入到输出 flow
@@ -40,8 +40,8 @@ description: Use when writing paper chapters - requires completed brainstorming,
 - [ ] **阶段1：规范合规检查**
 - [ ] **阶段2：质量检查（去AI化、语言流畅度）**
 - [ ] 更新 plan/progress.md
-- [ ] 展示写作成果，询问用户确认或修改
-- [ ] 用户确认后，询问是否继续下一章
+- [ ] 记录写作成果、验证状态和待修订项
+- [ ] 默认继续下一章；只有证据缺口、章节冲突或用户明确要求暂停时才阻断
 
 ## Chapter Agent Contract
 
@@ -66,6 +66,15 @@ Each chapter agent must return:
 - self-review against the rejection checks.
 
 The controller must record this in `plan/chapter-agent-provenance.md`. A chapter without provenance is not accepted for a full-paper redraft.
+
+### 合约执行规则
+
+- **DONE**: 章节通过自检，可合并到 full-paper.md
+- **DONE_WITH_CONCERNS**: 可合并但需在 plan/progress.md 记录未解决问题
+- **NEEDS_CONTEXT**: 阻断合并，需补充上下文后重试
+- **BLOCKED**: 阻断整个管线，需人工介入
+
+**强制**: 状态不是 DONE 或 DONE_WITH_CONCERNS 的章节，禁止合并到 full-paper.md。
 
 ## 两阶段 Review 机制
 
@@ -103,30 +112,28 @@ The controller must record this in `plan/chapter-agent-provenance.md`. A chapter
 ```dot
 digraph writing_chapters {
     "读取 outline.md" [shape=box];
-    "确认本章目标" [shape=box];
-    "用户确认方向?" [shape=diamond];
+    "记录本章目标" [shape=box];
+    "存在阻断问题?" [shape=diamond];
     "调用学科写作模块" [shape=box];
     "写作到 chapters/" [shape=box];
     "去AI化检查" [shape=box];
     "更新 progress.md" [shape=box];
     "展示成果" [shape=box];
-    "用户确认?" [shape=diamond];
-    "继续下一章?" [shape=diamond];
+    "记录验证状态" [shape=box];
+    "继续下一章" [shape=box];
     "结束或继续" [shape=doublecircle];
 
-    "读取 outline.md" -> "确认本章目标";
-    "确认本章目标" -> "用户确认方向?";
-    "用户确认方向?" -> "调用学科写作模块" [label="确认"];
-    "用户确认方向?" -> "确认本章目标" [label="调整"];
+    "读取 outline.md" -> "记录本章目标";
+    "记录本章目标" -> "存在阻断问题?";
+    "存在阻断问题?" -> "调用学科写作模块" [label="否"];
+    "存在阻断问题?" -> "记录本章目标" [label="解决后继续"];
     "调用学科写作模块" -> "写作到 chapters/";
     "写作到 chapters/" -> "去AI化检查";
     "去AI化检查" -> "更新 progress.md";
     "更新 progress.md" -> "展示成果";
-    "展示成果" -> "用户确认?";
-    "用户确认?" -> "写作到 chapters/" [label="修改"];
-    "用户确认?" -> "继续下一章?" [label="确认"];
-    "继续下一章?" -> "读取 outline.md" [label="是"];
-    "继续下一章?" -> "结束或继续" [label="否"];
+    "展示成果" -> "记录验证状态";
+    "记录验证状态" -> "继续下一章";
+    "继续下一章" -> "读取 outline.md";
 }
 ```
 
@@ -142,14 +149,14 @@ digraph writing_chapters {
 
 **参考结构模板**: `skills/brainstorming-research/templates.md` 了解不同论文类型的标准结构。
 
-### 2. 确认当前章节
+### 2. 记录当前章节
 
 > "根据大纲，本章「[章节名]」的主要内容是：
 > - [要点1]
 > - [要点2]
 > - [要点3]
 > 
-> 请确认这些要点，或告诉我需要调整的内容："
+> 我会按这些要点开始写作；如发现证据缺口、章节冲突或边界不清，会在 plan/progress.md 标记阻断。"
 
 ### 3. 调用学科模块
 
@@ -207,7 +214,7 @@ digraph writing_chapters {
 
 ## 章节写作模板
 
-### 开始写作前的确认
+### 开始写作前的记录
 
 > "我将开始写作「[章节名]」。
 > 
@@ -217,7 +224,7 @@ digraph writing_chapters {
 > - [小节1]
 > - [小节2]
 > 
-> 请确认或调整后开始写作："
+> 如发现目标、证据或章节边界冲突，我会标记阻断；否则按该记录开始写作。"
 
 ### 写作完成后的展示
 
@@ -234,7 +241,7 @@ digraph writing_chapters {
 > [章节内容预览，可以是开头部分]
 > ---
 > 
-> 如需修改请告诉我具体位置和修改意见，确认无误后我将更新进度。"
+> 如需修改请告诉我具体位置和修改意见；没有明确暂停时，我会记录验证状态并继续下一章。"
 
 ### 更新进度
 
@@ -245,7 +252,7 @@ digraph writing_chapters {
 
 - **状态**：已完成 / 待修改
 - **字数**：[字数]
-- **用户确认**：是 / 否
+- **验证状态**：已验证 / 待修订 / 阻断
 - **修改记录**：[如有]
 ```
 
@@ -327,16 +334,16 @@ digraph writing_chapters {
 
 记录用户选择到 notes.md。
 
-### 如果用户要求跳过确认
+### 如果用户要求加快推进
 
-> "理解你想加快进度。我会简化确认流程，但仍需要你在每章完成后简单确认。
+> "理解你想加快进度。我会按默认连续推进方式执行，但每章仍会记录验证状态、证据缺口和待修订项。
 > 
 > 现在开始写作「[章节名]」。"
 
 ## 关键原则
 
-- **一次只写一章** — 完成并确认后再开始下一章
-- **每章必须确认** — 不得自动继续
+- **一次只写一章** — 完成并记录验证状态后再开始下一章
+- **默认连续推进** — 不得因缺少固定确认话术而暂停；只有证据缺口、章节冲突或用户明确暂停时才阻断
 - **进度必须更新** — 每次写作后更新 progress.md
 - **风格必须一致** — 遵循学科模块规范
 - **引用必须真实** — 绝不编造
