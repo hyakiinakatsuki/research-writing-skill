@@ -30,8 +30,8 @@ The main execution model is:
 - `plan-template/` — Canonical template files copied into user project `plan/`.
 - `modules/` — Legacy compatibility docs; keep in sync conceptually with `skills/` behavior.
 - `scripts/` — Operational tooling:
-  - `init_plan.sh` / `init_plan.ps1`: bootstrap `plan/` from `plan-template/`
-  - `style_check.sh` / `style_check.ps1`: writing-style checks for markdown
+  - `init_plan.sh`: bootstrap `plan/` from `plan-template/`
+  - `style_check.sh`: writing-style checks for markdown
   - `scholar_search.py`: multi-source literature retrieval + citation formatting
   - `pdf_parser.py`: PDF text/section/metadata extraction
 
@@ -67,10 +67,6 @@ bash scripts/init_plan.sh /path/to/project
 
 PowerShell:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/init_plan.ps1
-```
-
 ### Style/lint-like checks for markdown output
 
 ```bash
@@ -78,10 +74,6 @@ bash scripts/style_check.sh chapters/01-introduction.md
 ```
 
 PowerShell:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/style_check.ps1 -FilePath chapters/01-introduction.md
-```
 
 ### Literature search utility
 
@@ -105,8 +97,7 @@ python scripts/pdf_parser.py paper.pdf --sections --json output.json
 
 There is no dedicated unit-test framework in this repository. Validation is script-level:
 - run `style_check` on modified markdown outputs
-- run `scripts/check_skill_integrity.ps1` after skill workflow edits
-- run `scripts/research_quality_gate.ps1 -ProjectPath <paper-project>` on manuscript workspaces
+- run `python3 scripts/research_quality_gate.py --project <paper-project>` on manuscript workspaces
 - run target Python scripts with representative inputs to verify behavior
 
 ## Important references

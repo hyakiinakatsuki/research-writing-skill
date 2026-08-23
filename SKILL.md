@@ -201,7 +201,7 @@ allowed-tools: Read Write Edit Bash WebSearch
 
 ## 状态契约
 
-`STATUS: PASS` 只表示终稿级门控全部通过。若 PowerShell 不可用、`research_quality_gate.ps1` 或 `strict_quality_gate.py` 未运行/失败、LaTeX/PDF/评审报告缺失，报告必须写 `STATUS: FAIL` 或 `STATUS: MANUAL_REQUIRED`，不能把 `DRAFT PASS` 再包装成 `STATUS: PASS`。
+`STATUS: PASS` 只表示终稿级门控全部通过。若 PowerShell 不可用、`research_quality_gate.py` 或 `strict_quality_gate.py` 未运行/失败、LaTeX/PDF/评审报告缺失，报告必须写 `STATUS: FAIL` 或 `STATUS: MANUAL_REQUIRED`，不能把 `DRAFT PASS` 再包装成 `STATUS: PASS`。
 
 终稿验收命令：
 
