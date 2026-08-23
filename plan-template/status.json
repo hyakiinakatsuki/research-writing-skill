@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "paper_id": "",
+  "status": "NEW",
+  "current_stage": "S0",
+  "completed_stages": [],
+  "active_run_id": "",
+  "stage_attempts": {},
+  "locked_by": "",
+  "lock_pid": "",
+  "started_at": "",
+  "finished_at": "",
+  "blocking_reason": "",
+  "next_command": "",
+  "next_human_action": "",
+  "expected_artifacts": [],
+  "last_artifact_hashes": {},
+  "last_log": "",
+  "gate_status": "",
+  "resumable_from": "",
+  "transition_journal": "ledgers/state-transitions.jsonl",
+  "updated_at": ""
+}

@@ -10,10 +10,10 @@ allowed-tools: Read Write Edit Bash WebSearch
 
 ## 哲学原则
 
-- **流程优于即兴** — 头脑风暴先行，结构确认再写作
+- **流程优于即兴** — 选题方案先记录，结构边界清楚后再写作
 - **证据优于声称** — 引用可追溯，绝不编造文献
 - **简洁优于复杂** — 去AI化写作，拒绝机械表达
-- **确认优于假设** — 每章用户确认，避免返工
+- **记录优于假设** — 每章写作、验证和待修订项必须落到 plan/，方向明确时默认连续推进
 
 ## 新架构（v3.0）
 
@@ -71,12 +71,12 @@ allowed-tools: Read Write Edit Bash WebSearch
 |----------|----------|
 | "用户说得很清楚了，直接开始写" | 必须先完成 brainstorming-research |
 | "这只是修改一小段" | 检查是否有 plan/，没有则先创建 |
-| "先写一段看看效果" | 必须先确认论文类型和章节结构 |
-| "用户很着急，跳过讨论" | 流程可以加速，但不能跳过关键确认 |
+| "先写一段看看效果" | 必须先记录论文类型、章节结构和证据边界 |
+| "用户很着急，跳过讨论" | 流程可以加速，但不能跳过选题、证据和状态记录 |
 | "这是简单任务，不需要 plan" | 任何写作任务都需要 plan 记录 |
 | "我知道怎么写论文" | 必须按用户选择的类型和结构写 |
 | "先把内容写完再说格式" | 格式在 brainstorming 阶段确定 |
-| "这章内容很简单，不用确认" | 每章写完都必须让用户确认 |
+| "这章内容很简单，不用记录" | 每章写完都必须记录验证状态、待修订项和下一步 |
 
 ### 文献类 Red Flags
 
@@ -96,6 +96,7 @@ allowed-tools: Read Write Edit Bash WebSearch
 | "引用应该是真的" | 调用 CrossRef API 或搜索验证 |
 | "格式应该没问题" | 运行格式检查脚本 |
 | "搜索完成" | 检查结果数量和 DOI 列表 |
+| "初稿能用，所以写PASS" | 初稿/草稿/跳过门控必须写 FAIL 或 MANUAL_REQUIRED |
 | "我很确信" | 确信 ≠ 证据，运行验证 |
 | "就这一次跳过验证" | 没有例外 |
 
@@ -113,19 +114,20 @@ allowed-tools: Read Write Edit Bash WebSearch
 2. **中型任务编排** → 调用 `paper-orchestration`
    - 多章节、文献驱动、实验图表或质量返工任务必须先生成任务包
    - 完成后记录 capability-use audit（能力使用审计）
+   - 终稿完成前必须运行 `scripts/status_contract.py <paper-project> --submission`
 
 3. **头脑风暴** → 调用 `brainstorming-research`
-   - 确认论文类型（7种）
-   - 确认学科领域
-   - 确认题目、研究背景、方法
-   - 确认章节结构
+   - 记录论文类型（7种）
+   - 记录学科领域
+   - 记录题目、研究背景、方法
+   - 记录章节结构
    - 检测 LaTeX 模板
    - 创建 plan/ 和 chapters/
 
 4. **章节写作** → 调用 `writing-chapters`
    - 每章独立文件
    - 两阶段 Review（见下方）
-   - 用户确认后继续
+   - 默认连续推进；证据缺口、章节冲突或用户明确暂停时才阻断
 
 5. **LaTeX 输出**（可选）→ 调用 `latex-output`
    - 用户提供模板
@@ -197,6 +199,16 @@ allowed-tools: Read Write Edit Bash WebSearch
 2. 英文文献可检索后引用，中文文献优先让用户提供来源。
 3. 任何引用必须可追溯（作者、年份、出处至少完整两项）。
 
+## 状态契约
+
+`STATUS: PASS` 只表示终稿级门控全部通过。若 PowerShell 不可用、`research_quality_gate.ps1` 或 `strict_quality_gate.py` 未运行/失败、LaTeX/PDF/评审报告缺失，报告必须写 `STATUS: FAIL` 或 `STATUS: MANUAL_REQUIRED`，不能把 `DRAFT PASS` 再包装成 `STATUS: PASS`。
+
+终稿验收命令：
+
+```bash
+python scripts/status_contract.py <paper-project> --submission
+```
+
 ## 版本信息
 
 - **版本**：3.1.0
@@ -211,4 +223,4 @@ allowed-tools: Read Write Edit Bash WebSearch
 4. **两阶段 Review** — 规范合规 + 质量检查
 5. **语言默认规则** — 毕业论文默认中文，期刊根据要求
 6. **结构模板** — 7种论文类型的默认结构模板
-7. **交互优化** — 让用户少做选择，多做确认
+7. **交互优化** — 让用户少做选择；方向明确时默认推进并记录，真实阻断时再提问

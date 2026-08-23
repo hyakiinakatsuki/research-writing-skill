@@ -124,6 +124,8 @@ description: Use for translation, polishing, or de-AI-ification of academic text
 | intricate | complex, detailed |
 | paramount | important, critical |
 
+> **权威规则维护在 `research-writing-skill/scripts/deai_constants.py`。** 英文模式已导出为 `EN_ABSOLUTE_PATTERNS`。新增禁用词请在 `deai_constants.py` 中添加，不要在此处维护副本。
+
 ### 3.3 去AI味（中文期刊论文，信息保留版）
 
 ```markdown

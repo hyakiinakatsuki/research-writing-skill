@@ -39,11 +39,11 @@ The main execution model is:
 
 When editing skills or workflow logic, maintain these repository-level invariants:
 
-- Do not bypass brainstorming for writing tasks.
+- Do not bypass topic-scope recording for writing tasks. When the user gives only a direction, use the repository default paper scope and record it instead of stopping for obvious confirmation.
 - Do not bypass `paper-orchestration` for medium/full-paper work.
 - Do not draft Introduction or Related Work without an evidence map.
 - Keep `plan/` as persistent project memory (`project-overview.md`, `progress.md`, `notes.md`, `outline.md`, `stage-gates.md`).
-- Keep chapter flow sequential and confirmation-driven (one chapter at a time, user confirmation before moving on).
+- Keep chapter flow auditable and provenance-driven. User-level default authorization permits subagent / multi-role chapter delegation; do not require a fixed confirmation sentence before dispatching or continuing chapters.
 - Do not fabricate citations or research facts.
 - Do not present mock/synthetic planning data as real results.
 - Keep user instructions and process notes out of manuscript body.

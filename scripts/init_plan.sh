@@ -14,7 +14,7 @@ PLAN_DIR="$PROJECT_ROOT/plan"
 mkdir -p "$PLAN_DIR"
 
 copied=0
-for name in project-overview.md progress.md notes.md outline.md stage-gates.md; do
+for name in project-overview.md progress.md notes.md outline.md stage-gates.md status.json; do
   src="$TEMPLATE_DIR/$name"
   dst="$PLAN_DIR/$name"
 

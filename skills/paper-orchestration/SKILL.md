@@ -17,6 +17,17 @@ For any medium task or full-paper task, do not write manuscript text until these
 - a task packet for the current section or deliverable
 - for full-paper drafting or redrafting, `plan/chapter-architecture.md`
 
+For review/framework papers, "no experiments" does not mean "no data or figures". Do not draft the final manuscript until these review assets exist or are explicitly created:
+
+- `plan/review-framework-asset-plan.md`
+- `figures/data-manifest.md`
+- at least one source-backed CSV/JSON file under `data/` or `figures/data/`
+- at least one generated figure script under `figures/`
+- at least one referenced figure in the manuscript plan, with PNG and SVG outputs expected
+- at least two evidence/industry tables planned for `full-paper.md`
+
+These assets may be literature-derived or source-derived, but they must not be mock/synthetic planning data in a final submission.
+
 Medium task means any request that affects more than one paragraph, one subsection, one chapter, one figure/table set, or any claim tied to references or experiments.
 
 ## Full-Paper Redraft Gate
@@ -54,7 +65,7 @@ For any full-paper draft or redraft, the controller must not write all chapters 
 - record the agent, prompt summary, inputs, output path, and review status in `plan/chapter-agent-provenance.md`;
 - perform a controller review after agent output before claiming progress.
 
-If subagents are not available, stop and ask the user whether to continue in degraded single-agent mode. Do not silently fall back to one-pass generation.
+Subagent / multi-role delegation is authorized by default for this project. Do not stop to ask for a fixed authorization sentence before dispatching chapter agents. If the runtime truly has no subagent facility, continue with bounded single-agent execution only when the task can still preserve separate task packets, disjoint file ownership, provenance records, and controller review; otherwise mark `MANUAL_REQUIRED` with the missing runtime capability. Do not silently fall back to one-pass generation.
 
 ## Stage Detection
 
@@ -64,12 +75,15 @@ Classify the current work before acting:
 |---|---|---|
 | S0 Scope | topic, target, structure unclear | `brainstorming-research` |
 | S1 Evidence | references, Introduction, Related Work | `evidence-driven-writing` + `literature-review` |
+| S1A Review Assets | review/framework paper, industry analysis, conceptual framework, no experiment chapter | `figures-python` or `figures-diagram` + `verification` |
 | S2 Method | model, algorithm, system, method section | `writing-chapters` with method flow gate |
 | S3 Experiments | setup, results, tables, charts | `experiment-results-planning` + `figures-python` |
 | S4 Drafting | section text | `writing-chapters` |
 | S5 Review | quality, consistency, submission risk | `peer-review` + `verification` |
 
 Record the stage in `plan/progress.md`.
+
+If the user provides only a broad direction or topic, use the project default scope instead of asking for confirmation: Chinese engineering review/framework paper, public literature/standards/application-scenario evidence, no invented experimental data, Markdown draft first, LaTeX/PDF later if requested, and no final/submission PASS claim.
 
 ## Task Packet
 
@@ -95,17 +109,38 @@ For chapter-writing packets, add:
 - Required argument chain, in paragraph roles rather than bullet content.
 - Minimum prose length.
 - Required sources and data artifacts.
+- Required review/framework asset plan when the paper has no experiment chapter.
 - Prohibited structure, especially bullet-like lists, process notes, and old chapter scaffolding.
 - Required handoff format: status, file path changed, unresolved evidence/data gaps, and self-review.
 
 ## Review Gates
 
-Every medium task needs two reviews before completion:
+Every medium task requires an independent review board before completion. The review roles, weights, and minimum-finding requirements are defined in `papers/scripts/review_roles.py` (the single authoritative source). At minimum, the following 6 core roles must be covered:
 
-1. Spec compliance review: did the output match the task packet and required artifacts?
-2. Quality review: are claims supported, section logic coherent, and manuscript pollution absent?
+1. **journal-editor** — editorial fitness, contribution clarity, target venue alignment
+2. **methodology-statistics** — research design, statistical validity, reproducibility
+3. **evidence-reproducibility** — evidence quality, data traceability, claim support
+4. **skeptic** — adversarial challenge, alternative explanations, hidden assumptions
+5. **reader** — readability, logical flow, accessibility to non-specialists
+6. **operator** — process compliance, artifact completeness, workflow integrity
 
-If either review fails, fix before moving to the next task.
+Each review must produce a structured report with evidence table, severity classification (P0/P1/P2), and quoted fragments from the manuscript. P0 findings block completion. P1 findings require a waiver record if not fixed.
+
+For full paper production (S8 review board), all 11 roles defined in `review_roles.py` are dispatched. See `runner_auto.py:run_auto_review_board` for the execution implementation.
+
+If any review fails, fix before moving to the next task.
+
+## Status Contract
+
+`STATUS: PASS` is reserved for final/submission completion. If a workspace is only a draft, if any terminal gate was skipped, or if PowerShell, LaTeX/PDF, independent review, or strict quality artifacts are missing, write `STATUS: FAIL` or `STATUS: MANUAL_REQUIRED`.
+
+Before final completion, run:
+
+```bash
+python scripts/status_contract.py <paper-project> --submission
+```
+
+Do not write `DRAFT PASS` together with `STATUS: PASS`; downstream scripts treat that as a hard failure.
 
 ## Capability-Use Audit
 
@@ -129,6 +164,7 @@ The task is not complete without this audit.
 - Treating user instructions as manuscript content. Convert instructions into structure or edits; never paste them into the body.
 - Claiming a section is "done" when it only has headings and placeholders.
 - Running style checks while skipping evidence, data, and claim checks.
+- Marking a review/framework paper complete after prose-only synthesis with no source-backed data files, figure scripts, or referenced figures.
 - Producing tables instead of prose to hide weak argumentation.
 - Keeping an old chapter split after the user rejects it. Rebuild the chapter architecture first.
 - Letting the controller write a full manuscript sequentially instead of using one independent agent per major chapter.
