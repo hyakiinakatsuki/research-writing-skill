@@ -40,6 +40,12 @@ count_regex() {
   grep -E -c "$pattern" "$FILE" 2>/dev/null || true
 }
 
+# Count total OCCURRENCES (not matching lines), matching strict gate re.findall counting.
+count_occurrences() {
+  local pattern="$1"
+  { grep -oE "$pattern" "$FILE" 2>/dev/null || true; } | wc -l | tr -d ' '
+}
+
 # ---------------------------------------------------------------------------
 # Load all patterns from deai_constants.py as JSON
 # ---------------------------------------------------------------------------
@@ -102,14 +108,13 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-echo
 echo "[2] Limited phrases"
 # Read limited rules as JSON array, iterate in bash
 LIMITED_COUNT=$(echo "$RULES_JSON" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['limited']))")
 for ((i=0; i<LIMITED_COUNT; i++)); do
   pattern=$(echo "$RULES_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['limited'][$i]['pattern'])")
   limit=$(echo "$RULES_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['limited'][$i]['limit'])")
-  count=$(count_regex "$pattern")
+  count=$(count_occurrences "$pattern")
   if [[ "$count" -le "$limit" ]]; then
     pass "$pattern: $count <= $limit"
   else

@@ -15,9 +15,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
-
 
 REQUIRED_CHAPTERS = [
     "00-abstract.md",
@@ -43,7 +41,7 @@ REVIEW_FRAMEWORK_CHAPTERS = [
 ]
 
 # DEAI word lists: import from shared authoritative source
-from deai_constants import ABSOLUTE_PATTERNS, LIMITED_PATTERNS, PARAGRAPH_WARN_CHARS, PARAGRAPH_MAX_CHARS
+from deai_constants import ABSOLUTE_PATTERNS, LIMITED_PATTERNS, PARAGRAPH_MAX_CHARS, PARAGRAPH_WARN_CHARS
 
 STRONG_EXPERIMENT_CLAIMS = [
     "实验结果表明",
@@ -163,21 +161,8 @@ BLOCKING_FINAL_PATTERNS = [
 ]
 
 
-@dataclass
-class Gate:
-    failures: list[str]
-    warnings: list[str]
-
-    def fail(self, message: str) -> None:
-        self.failures.append(message)
-        print(f"FAIL: {message}")
-
-    def warn(self, message: str) -> None:
-        self.warnings.append(message)
-        print(f"WARN: {message}")
-
-    def pass_(self, message: str) -> None:
-        print(f"PASS: {message}")
+from gate_kit import GateResult as Gate  # noqa: E402
+from gate_kit import is_review_framework
 
 
 def read_text(path: Path) -> str:
@@ -250,16 +235,6 @@ def paper_meta(root: Path) -> dict:
     return meta if isinstance(meta, dict) else {}
 
 
-def is_review_framework(root: Path) -> bool:
-    meta = paper_meta(root)
-    marker = " ".join(str(meta.get(key, "")) for key in ["paper_type", "workflow_mode", "model_abbr"]).lower()
-    if any(token in marker for token in ["review", "综述", "framework", "框架"]):
-        return True
-    architecture = root / "plan" / "chapter-architecture.md"
-    if architecture.exists():
-        text = read_text(architecture)
-        return "02-literature-framework.md" in text and "04-experiments.md" not in text
-    return False
 
 
 def required_chapters_for(root: Path) -> list[str]:
@@ -919,8 +894,7 @@ def check_single_source(root: Path, full_hash: str, gate: Gate) -> None:
                 subprocess.run(
                     [sys.executable, str(script_path), str(root), "--tex-out", str(expected_tex), "--manifest-out", str(expected_manifest)],
                     check=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    capture_output=True,
                     text=True,
                 )
                 expected = read_text(expected_tex)
@@ -1116,8 +1090,7 @@ def check_single_source(root: Path, full_hash: str, gate: Gate) -> None:
             pdf_text = subprocess.run(
                 ["pdftotext", str(pdf), "-"],
                 check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             ).stdout
             if "�" in pdf_text:
@@ -1543,13 +1516,13 @@ def _parse_csv_metrics(path: Path) -> list[dict]:
     """Parse raw-metrics.csv into structured list of {model, metric, value}."""
     metrics: list[dict] = []
     try:
-        lines = [l for l in read_text(path).splitlines() if l.strip()]
+        lines = [ln for ln in read_text(path).splitlines() if ln.strip()]
         if len(lines) < 2:
             return metrics
         header = [h.strip().lower() for h in lines[0].split(",")]
         for line in lines[1:]:
             cells = [c.strip() for c in line.split(",")]
-            row = dict(zip(header, cells))
+            row = dict(zip(header, cells, strict=False))
             try:
                 val = float(row.get("value", "0"))
                 metrics.append({
@@ -1959,6 +1932,23 @@ def check_submission_compliance(root: Path, text: str, gate: Gate) -> None:
     else:
         gate.warn("no supplementary material found (may be required for empirical papers)")
 
+    # 7. AI use disclosure — content-level check ported from the retired
+    # submission_checklist module: the file must exist AND mention AI usage.
+    ai_keywords = ["AI", "人工智能", "ChatGPT", "Claude", "LLM", "大语言模型",
+                   "artificial intelligence", "generated", "生成式"]
+    ai_found = False
+    for p in [root / "submission" / "ai-use-disclosure.md",
+              root / "plan" / "ai-use-disclosure.md"]:
+        if p.exists():
+            t = p.read_text(encoding="utf-8")
+            if any(kw in t for kw in ai_keywords):
+                ai_found = True
+                break
+    if ai_found:
+        gate.pass_("AI use disclosure found with substantive content")
+    else:
+        gate.fail("missing AI use disclosure (submission/ai-use-disclosure.md)")
+
 
 def check_statistical_reporting(root: Path, text: str, gate: Gate) -> None:
     """Check statistical reporting completeness for empirical papers.
@@ -2174,8 +2164,8 @@ def check_ledger_integrity(root: Path, gate: Gate) -> None:
         return
 
     output = result.stdout + result.stderr
-    fail_lines = [l for l in output.splitlines() if l.startswith("FAIL:")]
-    warn_lines = [l for l in output.splitlines() if l.startswith("WARN:")]
+    fail_lines = [ln for ln in output.splitlines() if ln.startswith("FAIL:")]
+    warn_lines = [ln for ln in output.splitlines() if ln.startswith("WARN:")]
 
     if result.returncode != 0 and fail_lines:
         for line in fail_lines:
@@ -2213,10 +2203,12 @@ def check_text_quality(root: Path, text: str, gate: Gate) -> None:
             gate.fail(f"text quality: {m.name} = {m.value} (threshold: {m.operator} {m.threshold}) — {m.detail}")
 
 
-def check_journal_compliance(root: Path, text: str, gate: Gate) -> None:
+def check_journal_compliance(root: Path, text: str, gate: Gate, blocking: bool = False) -> None:
     """Check paper against target journal template requirements.
 
-    Auto-detects the template from plan/auto-config.json or defaults to CSSCI General.
+    Advisory (WARN) in the default strict profile; blocking (FAIL) under
+    --submission when a template section exists. Auto-detects the template
+    from plan/auto-config.json or defaults to CSSCI General.
     """
     # Try to import journal_templates from papers/scripts/
     script_dir = Path(__file__).resolve().parent
@@ -2266,7 +2258,8 @@ def check_journal_compliance(root: Path, text: str, gate: Gate) -> None:
             if not (re.search(rf"#{1,3}\s*{re.escape(section)}", text) or section in text):
                 missing_sections.append(section)
         if missing_sections:
-            gate.warn(f"journal: missing recommended sections: {', '.join(missing_sections)}")
+            message = f"journal: missing recommended sections: {', '.join(missing_sections)}"
+            gate.fail(message) if blocking else gate.warn(message)
         else:
             gate.pass_(f"journal: all required sections present ({len(template.required_sections)})")
 
@@ -2278,21 +2271,72 @@ def check_journal_compliance(root: Path, text: str, gate: Gate) -> None:
             kw_count = len(re.findall(r"[，,;；]", kw_text)) + 1
             min_kw, max_kw = template.keywords_count
             if kw_count < min_kw:
-                gate.warn(f"journal: too few keywords ({kw_count}, min {min_kw})")
+                message = f"journal: too few keywords ({kw_count}, min {min_kw})"
+                gate.fail(message) if blocking else gate.warn(message)
             elif kw_count > max_kw:
-                gate.warn(f"journal: too many keywords ({kw_count}, max {max_kw})")
+                message = f"journal: too many keywords ({kw_count}, max {max_kw})"
+                gate.fail(message) if blocking else gate.warn(message)
             else:
                 gate.pass_(f"journal: keyword count OK ({kw_count})")
+
+
+def check_submission_signoff(root: Path, gate: Gate) -> None:
+    """Submission profile state requirement (schemas/state-transitions.json S11).
+
+    Accepts SUBMISSION_PACKAGE_READY, or TECHNICAL_PASS with human signoff
+    artifacts present: non-empty human_signoff_hashes in plan/status.json plus
+    ledgers/human-signoff.json."""
+    status_path = root / "plan" / "status.json"
+    if not status_path.exists():
+        gate.fail("submission: plan/status.json missing")
+        return
+    try:
+        status = json.loads(read_text(status_path))
+    except json.JSONDecodeError as exc:
+        gate.fail(f"submission: plan/status.json invalid JSON: {exc}")
+        return
+    if not isinstance(status, dict):
+        gate.fail("submission: plan/status.json must contain a JSON object")
+        return
+    st = str(status.get("status", ""))
+    signoff_hashes = status.get("human_signoff_hashes")
+    signoff_file = root / "ledgers" / "human-signoff.json"
+    if st == "SUBMISSION_PACKAGE_READY":
+        gate.pass_(f"submission: status.json status={st}")
+    elif st == "TECHNICAL_PASS":
+        if not isinstance(signoff_hashes, dict) or not signoff_hashes:
+            gate.fail(
+                "submission: TECHNICAL_PASS without human_signoff_hashes in "
+                "plan/status.json — run 'paperctl signoff' before submission packaging"
+            )
+        elif not signoff_file.exists():
+            gate.fail(
+                "submission: TECHNICAL_PASS without ledgers/human-signoff.json — "
+                "run 'paperctl signoff' before submission packaging"
+            )
+        else:
+            gate.pass_("submission: TECHNICAL_PASS with human signoff artifacts present")
+    else:
+        gate.fail(
+            f"submission: status.json status={st!r} (want SUBMISSION_PACKAGE_READY "
+            "or TECHNICAL_PASS with human signoff artifacts present)"
+        )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("project_path")
     parser.add_argument("--mode", default="strict", choices=["strict"])
+    parser.add_argument(
+        "--submission",
+        action="store_true",
+        help="Submission profile: additionally require S11 human-signoff state and "
+             "treat journal-compliance findings as blocking",
+    )
     args = parser.parse_args()
 
     root = Path(args.project_path).resolve()
-    gate = Gate(failures=[], warnings=[])
+    gate = Gate(failures=[], warnings=[], echo=True)
 
     print(f"Strict quality gate: {root}")
     text = check_structure(root, gate)
@@ -2317,8 +2361,10 @@ def main() -> int:
         check_reference_recency(root, gate)
         check_reference_language_balance(root, text, gate)
         check_plagiarism_clearance(root, gate)
-        check_journal_compliance(root, text, gate)
+        check_journal_compliance(root, text, gate, blocking=args.submission)
 
+    if args.submission:
+        check_submission_signoff(root, gate)
     print()
     print("Summary")
     print(f"Failures: {len(gate.failures)}")

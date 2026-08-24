@@ -13,10 +13,9 @@ import argparse
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
-
 
 SPECIALS = {
     "&": r"\&",
@@ -464,7 +463,6 @@ def render(md_path: Path, tex_path: Path, manifest_path: Path) -> None:
     table_lines: list[str] = []
     pending_table_caption = ""
     in_math = False
-    in_front_matter = True
     manifest = {
         "source": str(md_path),
         "source_hash": source_hash,
@@ -549,7 +547,6 @@ def render(md_path: Path, tex_path: Path, manifest_path: Path) -> None:
                 continue
 
             if level == 1:
-                in_front_matter = False
                 body.append(rf"\section{{{convert_inline(clean_heading)}}}")
                 continue
 

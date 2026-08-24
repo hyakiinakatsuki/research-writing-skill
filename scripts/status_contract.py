@@ -20,7 +20,6 @@ import re
 import sys
 from pathlib import Path
 
-
 FINAL_REPORTS = [
     "plan/final-quality-gate.md",
     "plan/final-gate-summary.md",
@@ -299,8 +298,8 @@ def main() -> int:
                 failures.append(f"plan/gate-binding.json is invalid JSON: {exc}")
                 binding = {}
             if isinstance(binding, dict):
-                if binding.get("status") != "PASS" and not state_ready:
-                    failures.append("plan/gate-binding.json status is not PASS")
+                if binding.get("status") != "PASS":
+                    failures.append("plan/gate-binding.json is not PASS")
                 if binding.get("project_path") != str(root):
                     failures.append("plan/gate-binding.json is not bound to current project path")
                 if full_hash and binding.get("full_paper_sha256") != full_hash:
@@ -314,6 +313,8 @@ def main() -> int:
             tex = read_text(root / "main.tex")
             if full_hash not in tex:
                 failures.append("main.tex is not bound to current full-paper sha256")
+        if not state_ready and not failures:
+            failures.append("submission_state_ready returned false")
         mode = "submission"
         required_reports = SUBMISSION_REQUIRED_REPORTS
     else:

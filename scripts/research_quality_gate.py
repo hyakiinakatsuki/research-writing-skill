@@ -11,33 +11,15 @@ Backward-compatible CLI flags: -SelfTest, -ProjectPath, -Submission are also acc
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
-
 
 # ──────────────────────────────────────────────────────────
 # Gate result accumulator
 # ──────────────────────────────────────────────────────────
-
-@dataclass
-class GateResult:
-    failures: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-
-    def fail(self, msg: str) -> None:
-        self.failures.append(msg)
-
-    def warn(self, msg: str) -> None:
-        self.warnings.append(msg)
-
-    @property
-    def passed(self) -> bool:
-        return len(self.failures) == 0
-
+from gate_kit import GateResult, is_review_framework  # noqa: E402
 
 # ──────────────────────────────────────────────────────────
 # Pattern constants (ported from .ps1 L151-155)
@@ -141,32 +123,6 @@ def get_prose_paragraph_count(text: str) -> int:
     return count
 
 
-def is_review_framework(root: Path) -> bool:
-    """Port of Test-ReviewFramework."""
-    # Check auto-config.json
-    config_path = root / "plan" / "auto-config.json"
-    if config_path.exists():
-        try:
-            data = json.loads(config_path.read_text(encoding="utf-8", errors="replace"))
-            paper_meta = data.get("paper_meta", {})
-            marker = " ".join(str(v) for v in [
-                paper_meta.get("paper_type", ""),
-                paper_meta.get("workflow_mode", ""),
-                paper_meta.get("model_abbr", ""),
-            ])
-            if re.search(r"review|framework|综述|框架", marker):
-                return True
-        except (json.JSONDecodeError, AttributeError):
-            pass
-
-    # Check chapter-architecture.md
-    arch_path = root / "plan" / "chapter-architecture.md"
-    if arch_path.exists():
-        arch_text = arch_path.read_text(encoding="utf-8", errors="replace")
-        if re.search(r"02-literature-framework\.md", arch_text) and not re.search(r"04-experiments\.md", arch_text):
-            return True
-
-    return False
 
 
 def count_markdown_tables(text: str) -> int:

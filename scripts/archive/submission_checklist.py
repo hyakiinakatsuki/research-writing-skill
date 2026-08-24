@@ -117,7 +117,6 @@ def check_submission(project: Path) -> dict:
     # ── 5. Bilingual figure/table captions ──
     if paper_text:
         fig_refs = re.findall(r"!\[([^\]]*)\]", paper_text)
-        table_captions = re.findall(r"\*\*表\s*\d+[^\*]*\*\*", paper_text)
         # Check figure captions for bilingual (Chinese + English)
         fig_bilingual = 0
         for cap in fig_refs:
