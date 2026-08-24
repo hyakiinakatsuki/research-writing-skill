@@ -12,7 +12,6 @@ import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 # ── Constants ─────────────────────────────────────────────────────────────
 
 # Chinese sentence-ending punctuation
@@ -181,8 +180,8 @@ def check_paragraph_length_variance(paragraphs: list[str]) -> MetricResult:
     else:
         # KS test: max deviation from uniform CDF
         ks_stat = 0.0
-        for i, l in enumerate(lengths):
-            expected = (l - min_len) / (max_len - min_len) if max_len > min_len else 0
+        for i, ln in enumerate(lengths):
+            expected = (ln - min_len) / (max_len - min_len) if max_len > min_len else 0
             observed = (i + 1) / n
             ks_stat = max(ks_stat, abs(expected - observed))
 
