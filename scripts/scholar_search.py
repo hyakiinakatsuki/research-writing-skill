@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Scholar Search - Multi-database academic literature search tool.
 
@@ -36,7 +35,8 @@ import time
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 try:
@@ -181,7 +181,7 @@ def to_text_citation(paper: dict, style: str = "apa") -> str:
         return f"{authors} ({year}). {title}. {journal}."
 
 
-def format_papers(papers: List[dict], fmt: str) -> str:
+def format_papers(papers: list[dict], fmt: str) -> str:
     """Format list of papers to specified format."""
     if fmt == "json":
         return json.dumps(papers, indent=2, ensure_ascii=False)
@@ -216,7 +216,7 @@ class ScholarSearch:
         key_str = f"{query}|{source}|{year_start}|{year_end}|{limit}"
         return hashlib.sha256(key_str.encode()).hexdigest()[:16]
 
-    def _get_cached(self, key: str) -> Optional[List[Dict[str, Any]]]:
+    def _get_cached(self, key: str) -> list[dict[str, Any]] | None:
         """Retrieve cached results if available."""
         if not self.cache_dir:
             return None
@@ -228,7 +228,7 @@ class ScholarSearch:
                 return None
         return None
 
-    def _put_cached(self, key: str, results: List[Dict[str, Any]]) -> None:
+    def _put_cached(self, key: str, results: list[dict[str, Any]]) -> None:
         """Store results in cache."""
         if not self.cache_dir:
             return
@@ -254,9 +254,6 @@ class ScholarSearch:
                     r["_cached"] = True
                 return source, cached, None
 
-            # Use a per-thread session for thread safety
-            session = requests.Session()
-            session.headers.update({"User-Agent": f"ScholarSearch/1.0 (mailto:{self.email})"})
 
             if source == "pubmed":
                 results = self._search_pubmed(query, year_start, year_end, limit)
@@ -290,11 +287,11 @@ class ScholarSearch:
     def search(
         self,
         query: str,
-        sources: List[str] = None,
+        sources: list[str] = None,
         year_start: int = None,
         year_end: int = None,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search multiple databases in parallel and aggregate results."""
         sources = sources or ["pubmed", "crossref", "semanticscholar", "arxiv", "openalex", "cnki", "baidu_xueshu"]
         all_results = []
@@ -339,7 +336,7 @@ class ScholarSearch:
 
     def _search_pubmed(
         self, query: str, year_start: int, year_end: int, limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search PubMed via E-utilities API."""
         # Build query
         pubmed_query = f"({query})[Title/Abstract]"
@@ -364,45 +361,41 @@ class ScholarSearch:
         if not pmids:
             return []
 
-        # Fetch metadata
+        # Fetch metadata for all PMIDs in a single batch request
         results = []
         fetch_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+        ids = ",".join(pmids[:limit])
 
-        for i, pmid in enumerate(pmids[:limit]):
-            if i > 0:
-                time.sleep(0.34)  # Rate limit: 3 requests/second
+        params = {"db": "pubmed", "id": ids, "retmode": "json"}
+        response = self.session.get(fetch_url, params=params, timeout=30)
+        response.raise_for_status()
+        result_map = response.json().get("result", {})
 
-            try:
-                params = {"db": "pubmed", "id": pmid, "retmode": "json"}
-                response = self.session.get(fetch_url, params=params, timeout=30)
-                data = response.json()
+        for pmid in pmids[:limit]:
+            result = result_map.get(pmid, {})
+            if result and not result.get("error"):
+                authors = [
+                    a.get("name", "")
+                    for a in result.get("authors", [])
+                ]
 
-                result = data.get("result", {}).get(pmid, {})
-                if result and not result.get("error"):
-                    authors = [
-                        a.get("name", "")
-                        for a in result.get("authors", [])
-                    ]
-
-                    results.append({
-                        "title": result.get("title", ""),
-                        "authors": authors,
-                        "year": result.get("pubdate", "")[:4] if result.get("pubdate") else None,
-                        "journal": result.get("fulljournalname", ""),
-                        "pmid": pmid,
-                        "doi": result.get("elocationid", "").replace("doi: ", "") if "doi" in result.get("elocationid", "").lower() else None,
-                        "abstract": None,  # Requires efetch
-                        "citations": None,
-                        "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
-                    })
-            except Exception as e:
-                print(f"Error fetching PMID {pmid}: {e}", file=sys.stderr)
+                results.append({
+                    "title": result.get("title", ""),
+                    "authors": authors,
+                    "year": result.get("pubdate", "")[:4] if result.get("pubdate") else None,
+                    "journal": result.get("fulljournalname", ""),
+                    "pmid": pmid,
+                    "doi": result.get("elocationid", "").replace("doi: ", "") if "doi" in result.get("elocationid", "").lower() else None,
+                    "abstract": None,  # Requires efetch
+                    "citations": None,
+                    "url": f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/",
+                })
 
         return results
 
     def _search_crossref(
         self, query: str, year_start: int, year_end: int, limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search CrossRef API."""
         url = "https://api.crossref.org/works"
 
@@ -456,7 +449,7 @@ class ScholarSearch:
 
     def _search_semanticscholar(
         self, query: str, year_start: int, year_end: int, limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search Semantic Scholar API."""
         url = "https://api.semanticscholar.org/graph/v1/paper/search"
 
@@ -502,10 +495,10 @@ class ScholarSearch:
 
     def _search_arxiv(
         self, query: str, year_start: int, year_end: int, limit: int
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search arXiv API."""
         search_query = f"all:{query}"
-        url = f"http://export.arxiv.org/api/query?search_query={quote(search_query)}&start=0&max_results={limit}"
+        url = f"https://export.arxiv.org/api/query?search_query={quote(search_query)}&start=0&max_results={limit}"
 
         time.sleep(3)  # Rate limit: 1 request per 3 seconds
 
@@ -557,18 +550,18 @@ class ScholarSearch:
                 "doi": doi,
                 "abstract": abstract,
                 "citations": None,
-                "pdf_url": f"http://arxiv.org/pdf/{arxiv_id}.pdf",
-                "url": f"http://arxiv.org/abs/{arxiv_id}",
+                "pdf_url": f"https://arxiv.org/pdf/{arxiv_id}.pdf",
+                "url": f"https://arxiv.org/abs/{arxiv_id}",
             })
 
         return results
 
     def _search_openalex(
         self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search OpenAlex (free, no API key required)."""
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         params = {
             "search": query,
@@ -643,10 +636,10 @@ class ScholarSearch:
 
     def _search_cnki(
         self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search CNKI (China National Knowledge Infrastructure) via OpenSearch API."""
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         # CNKI OpenSearch endpoint (public, no auth required for basic search)
         base_url = "https://api.cnki.net/openapi/search"
@@ -699,7 +692,7 @@ class ScholarSearch:
                 "doi": doi,
                 "abstract": item.get("abstract", item.get("summary", "")),
                 "citations": item.get("citedcount", item.get("citations", 0)),
-                "url": item.get("url", f"https://kns.cnki.net/"),
+                "url": item.get("url", "https://kns.cnki.net/"),
                 "source_db": "cnki",
                 "language": "zh",
             })
@@ -708,10 +701,10 @@ class ScholarSearch:
 
     def _search_cnki_html(
         self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Fallback: search CNKI via HTML scraping (when API unavailable)."""
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         # CNKI search URL
         search_url = "https://kns.cnki.net/kns8s/search"
@@ -757,11 +750,11 @@ class ScholarSearch:
             results.append({
                 "title": title,
                 "authors": authors,
-                "year": year_start or datetime.now().year,
+                "year": None,
                 "journal": "",
                 "doi": "",
                 "abstract": "",
-                "citations": 0,
+                "citations": None,
                 "url": "https://kns.cnki.net/",
                 "source_db": "cnki",
                 "language": "zh",
@@ -771,10 +764,10 @@ class ScholarSearch:
 
     def _search_baidu_xueshu(
         self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Search Baidu Scholar (百度学术) for Chinese academic literature."""
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         params = {
             "wd": query,
