@@ -7,9 +7,11 @@ Supported databases:
   - crossref: CrossRef (all disciplines)
   - semanticscholar: Semantic Scholar (AI-enhanced)
   - arxiv: arXiv (preprints, CS/physics/math)
-  - openalex: OpenAlex (free, all disciplines)
-  - cnki: CNKI (Chinese academic literature, 中国知网)
-  - baidu_xueshu: Baidu Scholar (百度学术, Chinese academic aggregator)
+  - openalex: OpenAlex (free, all disciplines; includes Chinese-language titles)
+
+Removed 2026-10: cnki / baidu_xueshu (unofficial, fragile, legally grey
+scraping channels). Chinese-language literature is served by OpenAlex
+(Chinese title records) plus manually registered supplementary sources.
 
 Supported output formats:
   - json: JSON format (default)
@@ -265,10 +267,13 @@ class ScholarSearch:
                 results = self._search_arxiv(query, year_start, year_end, limit)
             elif source == "openalex":
                 results = self._search_openalex(query, year_start, year_end, limit)
-            elif source == "cnki":
-                results = self._search_cnki(query, year_start, year_end, limit)
-            elif source == "baidu_xueshu":
-                results = self._search_baidu_xueshu(query, year_start, year_end, limit)
+            elif source in ("cnki", "baidu_xueshu"):
+                # Removed 2026-10: unofficial fragile scraping channels; fail
+                # loudly instead of silently returning nothing.
+                return source, [], (
+                    f"source '{source}' was removed (unofficial channel); "
+                    "use openalex or register supplementary sources"
+                )
             else:
                 return source, [], f"Unknown source '{source}'"
 
@@ -293,7 +298,7 @@ class ScholarSearch:
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         """Search multiple databases in parallel and aggregate results."""
-        sources = sources or ["pubmed", "crossref", "semanticscholar", "arxiv", "openalex", "cnki", "baidu_xueshu"]
+        sources = sources or ["pubmed", "crossref", "semanticscholar", "arxiv", "openalex"]
         all_results = []
 
         # Parallel search across sources (max 4 concurrent)
@@ -634,214 +639,6 @@ class ScholarSearch:
 
         return results
 
-    def _search_cnki(
-        self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> list[dict[str, Any]]:
-        """Search CNKI (China National Knowledge Infrastructure) via OpenSearch API."""
-        import urllib.parse
-        import urllib.request
-
-        # CNKI OpenSearch endpoint (public, no auth required for basic search)
-        base_url = "https://api.cnki.net/openapi/search"
-        params = {
-            "q": query,
-            "pageSize": str(min(limit, 50)),
-            "page": "1",
-            "sort": "relevance",
-        }
-        if year_start:
-            params["publishdate_from"] = f"{year_start}-01-01"
-        if year_end:
-            params["publishdate_to"] = f"{year_end}-12-31"
-
-        url = base_url + "?" + urllib.parse.urlencode(params)
-        headers = {
-            "User-Agent": "scholar_search.py/1.0 (academic research tool)",
-            "Accept": "application/json",
-        }
-
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except Exception as e:
-            print(f"CNKI API error: {e}", file=sys.stderr)
-            # Fallback: try CNKI search page scraping
-            return self._search_cnki_html(query, year_start, year_end, limit)
-
-        results = []
-        for item in data.get("data", data.get("results", [])):
-            authors_raw = item.get("authors", item.get("author", ""))
-            if isinstance(authors_raw, str):
-                authors = [a.strip() for a in re.split(r"[;；,，]", authors_raw) if a.strip()]
-            elif isinstance(authors_raw, list):
-                authors = [str(a) for a in authors_raw]
-            else:
-                authors = []
-
-            doi = item.get("doi", "")
-            if not doi:
-                # CNKI articles often don't have DOI; use CNKI URL as identifier
-                doi = ""
-
-            results.append({
-                "title": item.get("title", ""),
-                "authors": authors,
-                "year": item.get("year") or item.get("publishyear"),
-                "journal": item.get("journal", item.get("source", "")),
-                "doi": doi,
-                "abstract": item.get("abstract", item.get("summary", "")),
-                "citations": item.get("citedcount", item.get("citations", 0)),
-                "url": item.get("url", "https://kns.cnki.net/"),
-                "source_db": "cnki",
-                "language": "zh",
-            })
-
-        return results
-
-    def _search_cnki_html(
-        self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> list[dict[str, Any]]:
-        """Fallback: search CNKI via HTML scraping (when API unavailable)."""
-        import urllib.parse
-        import urllib.request
-
-        # CNKI search URL
-        search_url = "https://kns.cnki.net/kns8s/search"
-        params = {
-            "classid": "YSTT4HG0",
-            "kw": query,
-            "korder": "SU",
-        }
-        if year_start:
-            params["txt_1_special1"] = f"{year_start}-{year_end or datetime.now().year}"
-
-        url = search_url + "?" + urllib.parse.urlencode(params)
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            "Accept": "text/html",
-        }
-
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                html = resp.read().decode("utf-8", errors="replace")
-        except Exception as e:
-            print(f"CNKI HTML search error: {e}", file=sys.stderr)
-            return []
-
-        # Parse basic results from HTML
-        results = []
-        # Extract title-author pairs from search results
-        title_pattern = re.compile(r'<a[^>]*class="fz14"[^>]*>(.*?)</a>', re.DOTALL)
-        author_pattern = re.compile(r'<p class="author">.*?<a[^>]*>(.*?)</a>', re.DOTALL)
-
-        titles = title_pattern.findall(html)
-        authors_raw = author_pattern.findall(html)
-
-        for i, title in enumerate(titles[:limit]):
-            title = re.sub(r"<[^>]+>", "", title).strip()
-            if not title:
-                continue
-            author_str = authors_raw[i] if i < len(authors_raw) else ""
-            author_str = re.sub(r"<[^>]+>", "", author_str).strip()
-            authors = [a.strip() for a in re.split(r"[;；,，]", author_str) if a.strip()]
-
-            results.append({
-                "title": title,
-                "authors": authors,
-                "year": None,
-                "journal": "",
-                "doi": "",
-                "abstract": "",
-                "citations": None,
-                "url": "https://kns.cnki.net/",
-                "source_db": "cnki",
-                "language": "zh",
-            })
-
-        return results
-
-    def _search_baidu_xueshu(
-        self, query: str, year_start: int = None, year_end: int = None, limit: int = 20
-    ) -> list[dict[str, Any]]:
-        """Search Baidu Scholar (百度学术) for Chinese academic literature."""
-        import urllib.parse
-        import urllib.request
-
-        params = {
-            "wd": query,
-            "pn": "0",
-            "tn": "SE_baiduxueshu_c1gjeupa",
-            "ie": "utf-8",
-            "sc_as_para": "sc_lib:CNKI",
-        }
-        if year_start and year_end:
-            params["sc_from"] = str(year_start)
-            params["sc_to"] = str(year_end)
-
-        url = "https://xueshu.baidu.com/s?" + urllib.parse.urlencode(params)
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
-            "Accept": "text/html",
-        }
-
-        try:
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                html = resp.read().decode("utf-8", errors="replace")
-        except Exception as e:
-            print(f"Baidu Scholar error: {e}", file=sys.stderr)
-            return []
-
-        results = []
-        # Parse Baidu Scholar results
-        # Each result is in a div with class "sc_default_result"
-        item_pattern = re.compile(
-            r'<div class="sc_content"[^>]*>.*?<h3[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>'
-            r'.*?</h3>(.*?)</div>\s*</div>',
-            re.DOTALL
-        )
-
-        for match in item_pattern.finditer(html):
-            url_path, title_html, meta_html = match.groups()
-            title = re.sub(r"<[^>]+>", "", title_html).strip()
-            if not title:
-                continue
-
-            # Extract authors from meta
-            author_match = re.search(r'<p class="sc_info".*?>(.*?)</p>', meta_html, re.DOTALL)
-            authors = []
-            if author_match:
-                author_text = re.sub(r"<[^>]+>", "", author_match.group(1)).strip()
-                authors = [a.strip() for a in re.split(r"[;；,，]", author_text) if a.strip()]
-
-            # Extract journal and year from meta
-            journal_match = re.search(r'<a[^>]*class="sc_info_journal"[^>]*>(.*?)</a>', meta_html)
-            journal = re.sub(r"<[^>]+>", "", journal_match.group(1)).strip() if journal_match else ""
-            year_match = re.search(r'(\d{4})', meta_html)
-            year = int(year_match.group(1)) if year_match else None
-
-            # Extract citation count
-            cite_match = re.search(r'被引用.*?(\d+)', meta_html)
-            citations = int(cite_match.group(1)) if cite_match else 0
-
-            results.append({
-                "title": title,
-                "authors": authors,
-                "year": year,
-                "journal": journal,
-                "doi": "",
-                "abstract": "",
-                "citations": citations,
-                "url": f"https://xueshu.baidu.com{url_path}" if url_path.startswith("/") else url_path,
-                "source_db": "baidu_xueshu",
-                "language": "zh" if re.search(r"[一-鿿]", title) else "en",
-            })
-
-        return results[:limit]
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Search academic literature across multiple databases",
@@ -875,7 +672,7 @@ Supported formats:
     parser.add_argument(
         "--sources",
         default="crossref",
-        help="Comma-separated list of sources: pubmed,crossref,semanticscholar,arxiv (default: crossref)"
+        help="Comma-separated list of sources: pubmed,crossref,semanticscholar,arxiv,openalex (default: crossref)"
     )
     parser.add_argument(
         "--year",
