@@ -3,11 +3,11 @@ Figure Template - 科学图表生成模板
 使用方法：复制此文件到对应章节文件夹，修改main()函数中的绑定代码
 """
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.font_manager as fm
 from pathlib import Path
+
+import matplotlib.font_manager as fm
+import matplotlib.pyplot as plt
+import numpy as np
 
 # ============================================================
 # 中文字体配置
@@ -73,25 +73,25 @@ def setup_plot_style():
         'xtick.labelsize': 9,
         'ytick.labelsize': 9,
         'legend.fontsize': 9,
-        
+
         # 线条和标记
         'lines.linewidth': 1.5,
         'lines.markersize': 6,
-        
+
         # 坐标轴
         'axes.linewidth': 1.0,
         'axes.spines.top': False,
         'axes.spines.right': False,
-        
+
         # 网格
         'axes.grid': True,
         'grid.alpha': 0.3,
         'grid.linewidth': 0.5,
-        
+
         # 图例
         'legend.frameon': False,
         'legend.loc': 'best',
-        
+
         # 保存设置
         'savefig.dpi': 450,
         'savefig.bbox': 'tight',
@@ -105,16 +105,16 @@ def save_figure(fig, output_dir, fig_name):
     """保存图片为PNG和SVG格式"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # PNG格式（450 DPI）
-    fig.savefig(output_dir / f'{fig_name}.png', dpi=450, format='png', 
+    fig.savefig(output_dir / f'{fig_name}.png', dpi=450, format='png',
                 facecolor='white', edgecolor='none')
-    
+
     # SVG格式（矢量图）
     fig.savefig(output_dir / f'{fig_name}.svg', format='svg',
                 facecolor='white', edgecolor='none')
-    
-    print(f"✓ 图片已保存:")
+
+    print("✓ 图片已保存:")
     print(f"  - {output_dir / f'{fig_name}.png'}")
     print(f"  - {output_dir / f'{fig_name}.svg'}")
 
@@ -126,9 +126,9 @@ def save_figure(fig, output_dir, fig_name):
 def plot_line_chart(ax, x, y_dict, xlabel='X轴', ylabel='Y轴', title=None):
     """绑制折线图"""
     for i, (label, y) in enumerate(y_dict.items()):
-        ax.plot(x, y, color=COLORS[i % len(COLORS)], label=label, 
+        ax.plot(x, y, color=COLORS[i % len(COLORS)], label=label,
                 linewidth=1.5, marker='o', markersize=4)
-    
+
     if CHINESE_FONT:
         ax.set_xlabel(xlabel, fontproperties=CHINESE_FONT)
         ax.set_ylabel(ylabel, fontproperties=CHINESE_FONT)
@@ -148,7 +148,7 @@ def plot_bar_chart(ax, categories, values, xlabel='类别', ylabel='数值', tit
     colors = COLORS[:len(categories)]
     x_pos = np.arange(len(categories))
     bars = ax.bar(x_pos, values, color=colors, edgecolor='white', linewidth=0.5)
-    
+
     ax.set_xticks(x_pos)
     if CHINESE_FONT:
         ax.set_xticklabels(categories, fontproperties=CHINESE_FONT)
@@ -162,7 +162,7 @@ def plot_bar_chart(ax, categories, values, xlabel='类别', ylabel='数值', tit
         ax.set_ylabel(ylabel)
         if title:
             ax.set_title(title)
-    
+
     return bars
 
 
@@ -171,10 +171,10 @@ def plot_heatmap(ax, data, xlabel='X轴', ylabel='Y轴', title=None, cmap=None):
     if cmap is None:
         from matplotlib.colors import LinearSegmentedColormap
         cmap = LinearSegmentedColormap.from_list('custom', BLUE_GRADIENT)
-    
+
     im = ax.imshow(data, cmap=cmap, aspect='auto')
     plt.colorbar(im, ax=ax)
-    
+
     if CHINESE_FONT:
         ax.set_xlabel(xlabel, fontproperties=CHINESE_FONT)
         ax.set_ylabel(ylabel, fontproperties=CHINESE_FONT)
@@ -185,7 +185,7 @@ def plot_heatmap(ax, data, xlabel='X轴', ylabel='Y轴', title=None, cmap=None):
         ax.set_ylabel(ylabel)
         if title:
             ax.set_title(title)
-    
+
     return im
 
 
@@ -195,28 +195,28 @@ def plot_heatmap(ax, data, xlabel='X轴', ylabel='Y轴', title=None, cmap=None):
 
 def main():
     setup_plot_style()
-    
+
     # ========== 在此处编写具体绑定代码 ==========
-    
+
     # 示例：创建一个简单的折线图
     fig, ax = plt.subplots(figsize=(7, 5))
-    
+
     x = np.linspace(0, 10, 50)
     y_dict = {
         '模型A': np.sin(x) + np.random.normal(0, 0.1, len(x)),
         '模型B': np.cos(x) + np.random.normal(0, 0.1, len(x)),
         '模型C': np.sin(x) * 0.5 + 0.5 + np.random.normal(0, 0.1, len(x)),
     }
-    
+
     plot_line_chart(ax, x, y_dict, xlabel='时间 (s)', ylabel='幅值', title='模型性能对比')
-    
+
     # ========== 绑定代码结束 ==========
-    
+
     # 保存图片
     output_dir = Path(__file__).parent
     fig_name = Path(__file__).stem
     save_figure(fig, output_dir, fig_name)
-    
+
     plt.show()
 
 

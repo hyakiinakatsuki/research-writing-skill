@@ -183,20 +183,28 @@ def _cn_title_page(meta: dict, title: str, body: list[str]) -> None:
     author_line = meta.get("author_line") or "匿名评审稿"
     affiliation_line = meta.get("affiliation_line") or "作者与单位信息按投稿系统提交"
     manuscript_status = meta.get("manuscript_status") or "技术复核稿"
+    title_size = "3" if len(title) > 20 else "2"  # 长标题降号保证单行
     body.extend([
         r"\begin{titlepage}",
-        r"\centering",
-        r"\vspace*{1.5cm}",
+        r"\noindent\begin{tabular}{ll}"
+        rf"\heiti 分类号：& {convert_inline(meta.get('classification_no', '') or '—')} \\"
+        rf"[0.2em] \heiti 密\quad 级：& {convert_inline(meta.get('security_level', '') or '内部')} \\"
+        r"\end{tabular}"
+        r"\vspace*{0.8cm}",
+        r"{\color[HTML]{1F3864}\rule{0.86\textwidth}{0.6pt}\par}",
+        r"\vspace{0.9cm}",
         r"{\zihao{-4} CSSCI 期刊投稿稿件\par}",
         r"\vspace{1.2cm}",
-        rf"{{\heiti\zihao{{2}} {convert_inline(title)}\par}}",
+        rf"{{\heiti\zihao{{{title_size}}} {convert_inline(title)}\par}}",
     ])
     if meta.get("title_en"):
-        body.append(rf"{{\zihao{{4}} {convert_inline(meta['title_en'])}\par}}")
+        body.append(rf"{{\vspace{{0.5cm}}\zihao{{4}} {convert_inline(meta['title_en'])}\par}}")
     else:
         body.append(r"\vspace{0.1cm}")
     body.extend([
-        r"\vspace{1.5cm}",
+        r"\vspace{0.8cm}",
+        r"{\color[HTML]{1F3864}\rule{0.6\textwidth}{0.3pt}\par}",
+        r"\vspace{1.4cm}",
         rf"{{\zihao{{4}} \heiti {convert_inline(author_line)}\par}}",
         r"\vspace{0.5cm}",
         rf"{{\zihao{{-4}} {convert_inline(affiliation_line)}\par}}",
@@ -207,11 +215,18 @@ def _cn_title_page(meta: dict, title: str, body: list[str]) -> None:
         r"\heiti 投稿日期：& \today \\",
         rf"\heiti 稿件状态：& {convert_inline(manuscript_status)} \\",
         r"\end{tabular}",
-        r"\vspace*{1.5cm}",
+        r"\vfill",
+        r"{\color[HTML]{1F3864}\rule{0.86\textwidth}{0.6pt}\par}",
         r"\end{titlepage}",
-        r"\linenumbers",
+    ])
+    if str(meta.get("line_numbers", "")).lower() in ("1", "true", "yes"):
+        body.append(r"\linenumbers")
+    body.extend([
         r"\pagenumbering{Roman}",
         r"\tableofcontents",
+        r"\clearpage",
+        r"\listoffigures",
+        r"\listoftables",
         r"\clearpage",
         r"\pagenumbering{arabic}",
         "",
@@ -239,7 +254,12 @@ _CN_PREAMBLE = [
     r"\usepackage{xcolor}",
     r"\usepackage{xurl}",
     r"\usepackage{lineno}",
-    r"\usepackage[hidelinks]{hyperref}",
+    r"\usepackage[hang,flushmargin]{footmisc}",
+    r"\usepackage{microtype}",
+    r"\usepackage{hyperref}",
+    r"\numberwithin{equation}{section}",
+    r"\setlength{\footnotesep}{0.9em}",
+    r"\renewcommand{\footnoterule}{\vspace*{0.3em}\hrule width 0.3\textwidth height 0.4pt \vspace*{0.4em}}",
     r"\geometry{top=2.5cm,bottom=2.5cm,left=2.5cm,right=2.5cm,headheight=15pt,headsep=0.4cm}",
     r"\setstretch{1.5}",
     r"\setlength{\parindent}{2em}",
@@ -586,33 +606,65 @@ def render(md_path: Path, tex_path: Path, manifest_path: Path) -> None:
         f"% Template: {template.name}",
     ]
 
-    # Preamble
-    tex.extend(template.preamble)
+    # Base preamble from the selected template (packages + geometry),
+    # with meta-driven documentclass options (font size / two-side layout).
+    font_size = str(metadata.get("font_size") or "12pt")
+    class_opts = f"UTF8,a4paper,{font_size}"
+    if str(metadata.get("two_side", "")).lower() in ("1", "true", "yes"):
+        class_opts += ",twoside"
+    tex.extend(
+        line.replace(
+            r"\documentclass[UTF8,a4paper,12pt]{ctexart}",
+            rf"\documentclass[{class_opts}]{{ctexart}}",
+        )
+        for line in template.preamble
+    )
 
-    # Template-specific setup
     if template.language == "zh":
-        # Chinese template: add ctex-specific preamble
+        # Chinese template: premium setup — dynamic per-chapter headers,
+        # colored hyperlinks + PDF metadata, meta-driven spacing/captions.
+        meta_link = str(metadata.get("link_color") or "1F3864")
+        meta_url = str(metadata.get("url_color") or meta_link)
+        meta_spacing = str(metadata.get("line_spacing") or "1.5")
         tex.extend([
-            r"\ctexset{section={format=\centering\heiti\zihao{3},name={第,章},number=\chinese{section},aftername=\quad,beforeskip=1.2em,afterskip=0.9em},subsection={format=\heiti\zihao{4},beforeskip=0.9em,afterskip=0.45em},subsubsection={format=\heiti\zihao{-4},beforeskip=0.7em,afterskip=0.35em}}",
-            r"\captionsetup{font=small,labelfont=bf,labelsep=quad}",
-            r"\renewcommand{\contentsname}{目\quad 录}",
-            r"\pagestyle{fancy}",
-            r"\fancyhf{}",
-            rf"\fancyhead[L]{{\zihao{{-5}} {convert_inline(title)}}}",
-            r"\fancyhead[C]{\zihao{-5} 论文评审稿}",
-            r"\fancyhead[R]{\zihao{-5} 期刊投稿稿件}",
-            r"\fancyfoot[C]{\zihao{-5}\thepage}",
-            r"\renewcommand{\headrulewidth}{0.4pt}",
+            rf"\definecolor{{pclink}}{{HTML}}{{{meta_link}}}",
+            rf"\definecolor{{pcurl}}{{HTML}}{{{meta_url}}}",
+            r"\hypersetup{colorlinks=true,linkcolor=pclink,citecolor=pclink,urlcolor=pcurl}",
+            rf"\hypersetup{{pdftitle={{{convert_inline(title)}}},pdfauthor={{{convert_inline(str(metadata.get('author_line', '') or '匿名'))}}}}}",
+            rf"\setstretch{{{meta_spacing}}}",
+            r"\setlist{nosep}",
+            r"\fancyhead[R]{\zihao{-5}\leftmark}",
             r"\newcommand{\awardabstracttitle}{\begin{center}{\heiti\zihao{3}摘\quad 要}\end{center}}",
             r"\newcommand{\journalabstracttitle}{\begin{center}{\heiti\zihao{3}摘\quad 要}\end{center}}",
             r"\newcommand{\journalabstractentitle}{\begin{center}{\bfseries\zihao{3}Abstract}\end{center}}",
             r"\newcommand{\journalkeywordtitle}{\vspace{0.4em}{\heiti 关键词：}}",
         ])
+        if str(metadata.get("draft_watermark", "")).lower() in ("1", "true", "yes"):
+            tex.extend([
+                r"\usepackage{draftwatermark}",
+                r"\SetWatermarkText{草\quad 稿}",
+                r"\SetWatermarkScale{0.32}",
+                r"\SetWatermarkLightness{0.94}",
+            ])
 
     tex.append(r"\begin{document}")
 
     # Title page (template-specific)
     template.title_page_fn(metadata, title, tex)
+
+    # 每章起新页:除首个 \section 外,每个一级节前插入 \clearpage
+    # (meta.chapter_new_page 默认开启;置 0 恢复连续排版)。
+    new_page_on = str(metadata.get("chapter_new_page", "1")).lower() not in ("0", "false", "no")
+    if template.language == "zh" and new_page_on:
+        seen_first = False
+        new_body: list[str] = []
+        for line in body:
+            if line.startswith(r"\section{"):
+                if seen_first:
+                    new_body.append(r"\clearpage")
+                seen_first = True
+            new_body.append(line)
+        body = new_body
 
     # Body content
     tex.extend(body)
